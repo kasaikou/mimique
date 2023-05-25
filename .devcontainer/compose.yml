@@ -1,0 +1,25 @@
+services:
+  devcontainer:
+    build:
+      context: ..
+      dockerfile: .devcontainer/${DOCKERFILE:-fromrepo.dockerfile}
+      args:
+        - uername=vscode
+        - aptmirror=${APTMIRROR:-archive.ubuntu.com}
+    user: vscode
+    command: /bin/sh -c "sudo service dbus start && while sleep 1000; do :; done"
+    volumes:
+      - ..:/workspace
+      - ${CONFIGDIR}:/home/vscode/.config
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [ "gpu" ]
+    environment:
+      - DISPLAY=:0
+    env_file:
+      - .env
+      - ../.env

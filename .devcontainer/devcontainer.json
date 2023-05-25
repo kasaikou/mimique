@@ -1,0 +1,10 @@
+{
+    "name": "mimique Dev Container",
+    "dockerComposeFile": "./compose.yml",
+    "service": "devcontainer",
+    "workspaceFolder": "/workspace",
+    "remoteUser": "vscode",
+    "postStartCommand": {
+        "activate_unity": "Unity -batchmode -manualLicenseFile ${UNITY_LICENSE_ULF} --logfile",
+    }
+}
