@@ -1,0 +1,85 @@
+# image status
+ARG baseimage=nvidia/cuda:11.3.0-devel-ubuntu20.04
+ARG aptmirror=archive.ubuntu.com
+ARG username=vscode
+ARG useruid=1000
+ARG usergid=${useruid}
+ARG unity=2020.3.48f1
+
+# loading mode
+ARG loadmode=fromrepo
+
+FROM ${baseimage} AS core
+
+ARG aptmirror
+RUN sed -i "s@archive.ubuntu.com@${aptmirror}@g" /etc/apt/sources.list && \
+    apt-get update && \
+    DEBIAN_FRONTEND=nointeractive \
+    TZ=UTC \
+    apt-get install -y --no-install-recommends \
+    sudo \
+    tzdata \
+    wget \
+    tar \
+    curl \
+    unzip \
+    software-properties-common
+
+FROM core AS downloader
+
+WORKDIR /opt/download
+RUN wget https://public-cdn.cloud.unity3d.com/hub/prod/UnityHub.AppImage && \
+    chmod +x ./UnityHub.AppImage && \
+    ./UnityHub.AppImage --appimage-extract && \
+    mkdir -p /opt/usr/local && \
+    mv ./squashfs-root /opt/usr/local/unity
+
+RUN chmod -R 755 /opt/usr/local
+
+FROM core AS devcontainer
+
+RUN DEBIAN_FRONTEND=nointeractive \
+    TZ=UTC \
+    apt-get install -y --no-install-recommends \
+    ca-certificates \
+    git \
+    libasound2 \
+    libc6-dev \
+    libcap2 \
+    libgconf-2-4 \
+    libglu1 \
+    libgtk-3-0 \
+    libncurses5 \
+    libnotify4 \
+    libnss3 \
+    libxtst6 \
+    libxss1 \
+    xdg-utils \
+    xvfb \
+    zenity
+
+COPY --from=downloader /opt/usr/local /usr/local
+ENV PATH=$PATH:/usr/local/unity
+
+ARG unity
+RUN sh -c " \
+    Xvfb :99 -screen 0 1024x768x24 & \
+    ( \
+    sudo mkdir -p /opt/Unity/Hub/Editor &&  \
+    sudo chmod -R 777 /opt/Unity/Hub/Editor && \
+    DISPLAY=:99 unityhub --headless install-path --set /opt/Unity/Hub/Editor && \
+    DISPLAY=:99 unityhub --headless install --version ${unity} --childModules && \
+    pkill -fq 'Xvfb :99'; exit 0 \
+    ) \
+    "
+
+ENV PATH=$PATH:/opt/Unity/Hub/Editor/${unity}/Editor
+
+ARG username
+ARG useruid
+ARG usergid
+
+RUN groupadd --gid ${usergid} ${username} && \
+    useradd -s /bin/bash --uid ${useruid} --gid ${usergid} -m ${username} && \
+    echo ${username} ALL=\(root\) NOPASSWD:ALL > /etc/sudoers.d/${username} && \
+    chmod 0440 /etc/sudoers.d/${username}    
